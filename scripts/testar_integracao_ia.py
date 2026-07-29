@@ -1,4 +1,4 @@
-from alfabot.services.ai_service import gerar_resposta_ia
+from curumim.services.ai_service import gerar_resposta_ia
 
 pergunta = "O que são os búfalos na ilha do Marajó?"
 print(f"Pergunta: {pergunta}")

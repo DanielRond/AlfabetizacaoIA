@@ -2,13 +2,13 @@ import os
 from typing import Any, Tuple, Union
 from flask import Flask, request, jsonify, make_response, Response
 from dotenv import load_dotenv
-from src.alfabot.logger_config import logger
+from src.curumim.logger_config import logger
 
 # Importações internas
-from src.alfabot.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
-from src.alfabot.services.whatsapp_service import enviar_mensagem_texto
-from src.alfabot.services.ai_service import gerar_resposta_ia
-from src.alfabot.services.voice_service import baixar_audio, transcrever_audio
+from src.curumim.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
+from src.curumim.services.whatsapp_service import enviar_mensagem_texto
+from src.curumim.services.ai_service import gerar_resposta_ia
+from src.curumim.services.voice_service import baixar_audio, transcrever_audio
 
 load_dotenv()
 

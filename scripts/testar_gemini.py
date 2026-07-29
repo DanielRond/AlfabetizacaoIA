@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from alfabot.services.ai_service import gerar_resposta_ia
+from curumim.services.ai_service import gerar_resposta_ia
 
 # ISSO É O MAIS IMPORTANTE:
 load_dotenv()

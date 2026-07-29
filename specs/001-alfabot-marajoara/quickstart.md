@@ -28,7 +28,7 @@ If the transcription model is not already available through Faster-Whisper cache
 ## Run the application
 
 ```bash
-uv run flask --app alfabot.app run --host 0.0.0.0 --port 5000 --debug
+uv run flask --app curumim.app run --host 0.0.0.0 --port 5000 --debug
 ```
 
 ## Expose the webhook locally

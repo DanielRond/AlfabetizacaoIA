@@ -1,7 +1,7 @@
 import os
 import requests
 from faster_whisper import WhisperModel
-from src.alfabot.logger_config import logger
+from src.curumim.logger_config import logger
 
 # Configurações centralizadas
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")

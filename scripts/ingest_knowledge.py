@@ -1,6 +1,6 @@
 import os
 from loguru import logger
-from alfabot.services.rag_service import adicionar_conhecimento
+from curumim.services.rag_service import adicionar_conhecimento
 
 
 def popular_banco():

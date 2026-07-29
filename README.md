@@ -110,7 +110,7 @@ uv run python main.py
 Ou diretamente:
 
 ```bash
-python -m src.alfabot.main
+python -m src.curumim.main
 ```
 
 ### 6. Expor o webhook (desenvolvimento)

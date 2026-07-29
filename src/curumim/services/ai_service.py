@@ -1,7 +1,7 @@
 import os
 import requests
 from loguru import logger
-from src.alfabot.services.rag_service import buscar_contexto
+from src.curumim.services.rag_service import buscar_contexto
 
 # Configurações globais (carregadas uma vez na importação)
 PROVIDER = os.getenv("IA_PROVIDER", "ollama")

@@ -2,7 +2,7 @@ import os
 import requests
 
 # Importação do logger unificado do seu projeto
-from src.alfabot.logger_config import logger
+from src.curumim.logger_config import logger
 
 # Configurações centralizadas no topo do módulo (evita ler o .env a cada mensagem)
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
