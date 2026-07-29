@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from src.alfabot.logger_config import logger
 
 # Importações internas
-from src.alfabot.models.database import SessionLocal, LearnerProfile, inicializar_banco
+from src.alfabot.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
 from src.alfabot.services.whatsapp_service import enviar_mensagem_texto
 from src.alfabot.services.ai_service import gerar_resposta_ia
 from src.alfabot.services.voice_service import baixar_audio, transcrever_audio
@@ -114,16 +114,40 @@ def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
 # --- REGRA DE NEGÓCIO ---
 
 def processar_interacao_aluno(numero: str, texto: str):
-    """Gerencia o acesso ao banco de dados e a comunicação com a IA."""
+    """Gerencia o acesso ao banco de dados, salva o histórico e comunica com a IA."""
     with SessionLocal() as session:
         try:
+            # 1. Busca ou cria o perfil do aluno
             aluno = session.query(LearnerProfile).filter_by(phone_number=numero).first()
             if not aluno:
                 aluno = LearnerProfile(phone_number=numero, pedagogical_level='iniciante')
                 session.add(aluno)
                 session.commit()
 
+            # 2. Salva a mensagem recebida do aluno no banco de dados
+            msg_aluno = ChatMessage(
+                learner_id=aluno.id,
+                sender='user',
+                content=texto,
+                message_type='text'
+            )
+            session.add(msg_aluno)
+            session.commit()
+
+            # 3. Gera a resposta da IA (Curumim)
             resposta = gerar_resposta_ia(texto, aluno.pedagogical_level)
+
+            # 4. Salva a resposta gerada pela IA no banco de dados
+            msg_ia = ChatMessage(
+                learner_id=aluno.id,
+                sender='assistant',
+                content=resposta,
+                message_type='text'
+            )
+            session.add(msg_ia)
+            session.commit()
+
+            # 5. Envia a resposta de volta para o WhatsApp do aluno
             enviar_mensagem_texto(numero, resposta)
 
         except Exception as e:

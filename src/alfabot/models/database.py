@@ -1,23 +1,19 @@
 from pathlib import Path
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 # --- CONFIGURAÇÃO DE CAMINHO ---
-# Resolve o diretório raiz do projeto de forma robusta e cross-platform
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DB_DIR = PROJECT_ROOT / "data"
 
-# Cria a pasta data automaticamente
 DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "alfabot.db"
+DB_PATH = DB_DIR / "curumim.db"
 
-# URL de conexão formatada para SQLite
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 Base = declarative_base()
 
-# Adicionado check_same_thread=False para compatibilidade com Flask/Threads
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -30,11 +26,37 @@ class LearnerProfile(Base):
     pedagogical_level = Column(String, default='iniciante')
     onboarding_state = Column(String, default='new')
 
-    # Uso de datetime do Python com timezone para consistência absoluta
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime,
-                        default=lambda: datetime.now(timezone.utc),
-                        onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relacionamento opcional para facilitar a busca de mensagens do aluno
+    mensagens = relationship("ChatMessage", back_populates="learner", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    __tablename__ = 'chat_messages'
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Associa a mensagem ao ID do perfil do aluno
+    learner_id = Column(Integer, ForeignKey('learner_profiles.id'), nullable=False, index=True)
+
+    # 'user' para aluno, 'assistant' para a IA (Curumim)
+    sender = Column(String, nullable=False)
+
+    # Usamos Text em vez de String para suportar mensagens mais longas
+    content = Column(Text, nullable=False)
+
+    # Para registrar se foi texto, áudio transcrito, etc.
+    message_type = Column(String, default='text')
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+
+    # Relacionamento reverso
+    learner = relationship("LearnerProfile", back_populates="mensagens")
 
 
 def inicializar_banco():
