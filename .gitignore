@@ -36,3 +36,7 @@ Thumbs.db
 
 # Arquivos temporários do Hookdeck
 hookdeck-config.json
+
+# Arquivos de áudio
+*.wav
+models/
