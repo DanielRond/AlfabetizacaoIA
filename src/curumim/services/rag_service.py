@@ -1,7 +1,7 @@
 import os
 from typing import Any
 import chromadb
-from src.curumim.logger_config import logger
+from curumim.logger_config import logger
 
 # Configurações
 DB_PATH = os.path.join("data", "chroma_db")
