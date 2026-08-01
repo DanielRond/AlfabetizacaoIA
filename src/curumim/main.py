@@ -1,14 +1,16 @@
 import os
+import threading
 from typing import Any, Tuple, Union
 from flask import Flask, request, jsonify, make_response, Response
 from dotenv import load_dotenv
-from src.curumim.logger_config import logger
+from curumim.logger_config import logger
 
 # Importações internas
-from src.curumim.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
-from src.curumim.services.whatsapp_service import enviar_mensagem_texto
-from src.curumim.services.ai_service import gerar_resposta_ia
-from src.curumim.services.voice_service import baixar_audio, transcrever_audio
+from curumim.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
+from curumim.services.whatsapp_service import enviar_mensagem_texto, enviar_mensagem_audio
+from curumim.services.ai_service import gerar_resposta_ia
+from curumim.services.voice_service import baixar_audio, transcrever_audio
+from curumim.services.tts_service import sintetizar_fala, tts_disponivel
 
 load_dotenv()
 
@@ -50,7 +52,7 @@ def receber_mensagem() -> Tuple[Response, int]:
         return jsonify({"status": "recebido"}), 200
 
     for msg_info in _extrair_mensagens(dados):
-        processar_mensagem_whatsapp(msg_info)
+        threading.Thread(target=processar_mensagem_whatsapp, args=(msg_info,)).start()
 
     return jsonify({"status": "recebido"}), 200
 
@@ -83,7 +85,7 @@ def processar_mensagem_whatsapp(mensagem_info: dict[str, Any]):
     if not texto.strip():
         return
 
-    processar_interacao_aluno(numero, texto)
+    processar_interacao_aluno(numero, texto, veio_como_audio=(tipo_msg == 'audio'))
 
 
 def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
@@ -113,8 +115,11 @@ def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
 
 # --- REGRA DE NEGÓCIO ---
 
-def processar_interacao_aluno(numero: str, texto: str):
+def processar_interacao_aluno(numero: str, texto: str, veio_como_audio: bool = False):
     """Gerencia o acesso ao banco de dados, salva o histórico e comunica com a IA."""
+    resposta = None
+    nivel = 'iniciante'
+
     with SessionLocal() as session:
         try:
             # 1. Busca ou cria o perfil do aluno
@@ -124,18 +129,20 @@ def processar_interacao_aluno(numero: str, texto: str):
                 session.add(aluno)
                 session.commit()
 
+            nivel = aluno.pedagogical_level
+
             # 2. Salva a mensagem recebida do aluno no banco de dados
             msg_aluno = ChatMessage(
                 learner_id=aluno.id,
                 sender='user',
                 content=texto,
-                message_type='text'
+                message_type='audio' if veio_como_audio else 'text'
             )
             session.add(msg_aluno)
             session.commit()
 
             # 3. Gera a resposta da IA (Curumim)
-            resposta = gerar_resposta_ia(texto, aluno.pedagogical_level)
+            resposta = gerar_resposta_ia(texto, nivel)
 
             # 4. Salva a resposta gerada pela IA no banco de dados
             msg_ia = ChatMessage(
@@ -153,6 +160,32 @@ def processar_interacao_aluno(numero: str, texto: str):
         except Exception as e:
             logger.error(f"Erro na regra de negócio para {numero}: {e}")
             session.rollback()
+            return
+
+    if resposta and tts_disponivel() and deve_incluir_audio(nivel, veio_como_audio):
+        _responder_com_audio(numero, resposta)
+
+
+def _responder_com_audio(numero: str, resposta: str):
+    caminho_audio = None
+    try:
+        caminho_audio = sintetizar_fala(resposta)
+        if caminho_audio:
+            enviar_mensagem_audio(numero, caminho_audio)
+    except Exception as e:
+        logger.error(f"Erro ao gerar/enviar áudio de resposta para {numero}: {e}")
+    finally:
+        if caminho_audio and os.path.exists(caminho_audio):
+            os.remove(caminho_audio)
+
+
+# TODO: Implementar lógica de atualização do nível pedagógico do aluno com base nas interações e respostas da IA. Esse formato é só um ponto de partida.
+def deve_incluir_audio(nivel_pedagogico: str, veio_como_audio: bool) -> bool:
+    if nivel_pedagogico in ("new", "iniciante"):
+        return True  # reforço máximo de áudio pra quem mais precisa
+    if nivel_pedagogico == "basico":
+        return veio_como_audio  # mantém o formato que o aluno já usa
+    return False  # intermediario+: só texto, a IA já domina a leitura
 
 
 # --- INICIALIZAÇÃO ---
