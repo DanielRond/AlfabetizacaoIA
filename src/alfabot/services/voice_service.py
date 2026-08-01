@@ -1,12 +1,7 @@
 import os
 import requests
-from dotenv import load_dotenv
 from faster_whisper import WhisperModel
-from alfabot.logger_config import logger
-
-# Garante que o .env já foi carregado antes de ler as variáveis abaixo,
-# independente da ordem de import de quem chama este módulo.
-load_dotenv()
+from src.alfabot.logger_config import logger
 
 # Configurações centralizadas
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")

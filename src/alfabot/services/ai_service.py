@@ -1,12 +1,7 @@
 import os
 import requests
-from dotenv import load_dotenv
 from loguru import logger
-from alfabot.services.rag_service import buscar_contexto
-
-# Garante que o .env já foi carregado antes de ler as variáveis abaixo,
-# independente da ordem de import de quem chama este módulo.
-load_dotenv()
+from src.alfabot.services.rag_service import buscar_contexto
 
 # Configurações globais (carregadas uma vez na importação)
 PROVIDER = os.getenv("IA_PROVIDER", "ollama")
