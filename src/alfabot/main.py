@@ -1,18 +1,14 @@
-import threading
 import os
 from typing import Any, Tuple, Union
 from flask import Flask, request, jsonify, make_response, Response
 from dotenv import load_dotenv
-from alfabot.logger_config import logger
+from src.alfabot.logger_config import logger
 
 # Importações internas
-from alfabot.models.database import SessionLocal, LearnerProfile, inicializar_banco
-from alfabot.services.whatsapp_service import enviar_mensagem_texto
-from alfabot.services.ai_service import gerar_resposta_ia
-from alfabot.services.voice_service import baixar_audio, transcrever_audio
-from alfabot.services.whatsapp_service import enviar_mensagem_texto, enviar_mensagem_audio
-from alfabot.services.tts_service import sintetizar_fala, tts_disponivel
-
+from src.alfabot.models.database import SessionLocal, LearnerProfile, inicializar_banco
+from src.alfabot.services.whatsapp_service import enviar_mensagem_texto
+from src.alfabot.services.ai_service import gerar_resposta_ia
+from src.alfabot.services.voice_service import baixar_audio, transcrever_audio
 
 load_dotenv()
 
@@ -48,12 +44,13 @@ def verificar_webhook() -> Union[Response, Tuple[Response, int]]:
 
 
 def receber_mensagem() -> Tuple[Response, int]:
+    """Recebe o POST da Meta e distribui as mensagens para processamento."""
     dados = request.json
     if not dados or 'entry' not in dados:
         return jsonify({"status": "recebido"}), 200
 
     for msg_info in _extrair_mensagens(dados):
-        threading.Thread(target=processar_mensagem_whatsapp, args=(msg_info,)).start()
+        processar_mensagem_whatsapp(msg_info)
 
     return jsonify({"status": "recebido"}), 200
 
@@ -73,6 +70,7 @@ def _extrair_mensagens(dados: Any):
 # --- LÓGICA DE NORMALIZAÇÃO ---
 
 def processar_mensagem_whatsapp(mensagem_info: dict[str, Any]):
+    """Orquestra a extração do texto da mensagem e repassa para a regra de negócio."""
     numero = str(mensagem_info.get('from') or "")
     tipo_msg = str(mensagem_info.get('type') or "")
     texto = ""
@@ -85,8 +83,7 @@ def processar_mensagem_whatsapp(mensagem_info: dict[str, Any]):
     if not texto.strip():
         return
 
-    processar_interacao_aluno(numero, texto, veio_como_audio=(tipo_msg == 'audio'))
-
+    processar_interacao_aluno(numero, texto)
 
 
 def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
@@ -116,10 +113,8 @@ def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
 
 # --- REGRA DE NEGÓCIO ---
 
-def processar_interacao_aluno(numero: str, texto: str, veio_como_audio: bool = False):
-    resposta = None
-    nivel = 'iniciante'
-
+def processar_interacao_aluno(numero: str, texto: str):
+    """Gerencia o acesso ao banco de dados e a comunicação com a IA."""
     with SessionLocal() as session:
         try:
             aluno = session.query(LearnerProfile).filter_by(phone_number=numero).first()
@@ -128,40 +123,12 @@ def processar_interacao_aluno(numero: str, texto: str, veio_como_audio: bool = F
                 session.add(aluno)
                 session.commit()
 
-            nivel = aluno.pedagogical_level
-            resposta = gerar_resposta_ia(texto, nivel)
+            resposta = gerar_resposta_ia(texto, aluno.pedagogical_level)
             enviar_mensagem_texto(numero, resposta)
 
         except Exception as e:
             logger.error(f"Erro na regra de negócio para {numero}: {e}")
             session.rollback()
-            return
-
-    if resposta and tts_disponivel() and deve_incluir_audio(nivel, veio_como_audio):
-        _responder_com_audio(numero, resposta)
-
-
-def _responder_com_audio(numero: str, resposta: str):
-    caminho_audio = None
-    try:
-        caminho_audio = sintetizar_fala(resposta)
-        if caminho_audio:
-            enviar_mensagem_audio(numero, caminho_audio)
-    except Exception as e:
-        logger.error(f"Erro ao gerar/enviar áudio de resposta para {numero}: {e}")
-    finally:
-        if caminho_audio and os.path.exists(caminho_audio):
-            os.remove(caminho_audio)
-
-
-
-# TODO: Implementar lógica de atualização do nível pedagógico do aluno com base nas interações e respostas da IA. Esse formato é só um ponto de partida.
-def deve_incluir_audio(nivel_pedagogico: str, veio_como_audio: bool) -> bool:
-    if nivel_pedagogico in ("new", "iniciante"):
-        return True  # reforço máximo de áudio pra quem mais precisa
-    if nivel_pedagogico == "basico":
-        return veio_como_audio  # mantém o formato que o aluno já usa
-    return False  # intermediario+: só texto, a IA já domina a leitura
 
 
 # --- INICIALIZAÇÃO ---
