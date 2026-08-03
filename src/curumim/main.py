@@ -81,6 +81,9 @@ def processar_mensagem_whatsapp(mensagem_info: dict[str, Any]):
         texto = mensagem_info.get('text', {}).get('body', '')
     elif tipo_msg == 'audio':
         texto = extrair_texto_de_audio(mensagem_info, numero)
+    elif tipo_msg == 'image':
+        registrar_tentativa_imagem(numero, mensagem_info)
+        return
 
     if not texto.strip():
         return
@@ -112,6 +115,40 @@ def extrair_texto_de_audio(mensagem_info: dict[str, Any], numero: str) -> str:
         enviar_mensagem_texto(numero, "Desculpe, não consegui entender o áudio. Pode repetir?")
         return ""
 
+def registrar_tentativa_imagem(numero: str, mensagem_info: dict[str, Any]):
+    """Salva no histórico que o aluno tentou enviar uma imagem e responde com uma recusa amigável."""
+    caption = mensagem_info.get('image', {}).get('caption') or "[imagem enviada]"
+    resposta = "Poxa, eu não consigo ver sua imagem, consegue digitar ou mandar um áudio do que quer dizer?"
+
+    with SessionLocal() as session:
+        try:
+            aluno = session.query(LearnerProfile).filter_by(phone_number=numero).first()
+            if not aluno:
+                aluno = LearnerProfile(phone_number=numero, pedagogical_level='iniciante')
+                session.add(aluno)
+                session.commit()
+
+            session.add(ChatMessage(
+                learner_id=aluno.id,
+                sender='user',
+                content=caption,
+                message_type='image'
+            ))
+
+            session.add(ChatMessage(
+                learner_id=aluno.id,
+                sender='assistant',
+                content=resposta,
+                message_type='text'
+            ))
+
+            session.commit()
+
+        except Exception as e:
+            logger.error(f"Erro ao registrar tentativa de imagem de {numero}: {e}")
+            session.rollback()
+
+    enviar_mensagem_texto(numero, resposta)
 
 # --- REGRA DE NEGÓCIO ---
 
