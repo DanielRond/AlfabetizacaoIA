@@ -10,7 +10,7 @@ from curumim.logger_config import logger
 # independente da ordem de import de quem chama este módulo.
 load_dotenv()
 
-TEMP_DIR = "data"
+TEMP_DIR = "data/audios"
 TTS_ENABLED = os.getenv("TTS_ENABLED", "true").lower() == "true"
 TTS_VOICE = os.getenv("TTS_VOICE", "pf_dora")
 KOKORO_MODEL_PATH = os.getenv("KOKORO_MODEL_PATH", "models/kokoro-v1.0.onnx")
