@@ -26,10 +26,10 @@
 
 **Goal**: Move message processing, RAG, transcription, and response generation behind an internal HTTP API.
 
-- [ ] T009 Add the Python endpoint that receives normalized inbound messages
-- [ ] T010 Reuse learner profile lookup and onboarding state in the new API path
-- [ ] T011 Keep the text, audio, and RAG pipeline in Python
-- [ ] T012 Return structured ProcessingResult payloads to Node
+- [X] T009 Add the Python endpoint that receives normalized inbound messages
+- [X] T010 Reuse learner profile lookup and onboarding state in the new API path
+- [X] T011 Keep the text, audio, and RAG pipeline in Python
+- [X] T012 Return structured ProcessingResult payloads to Node
 
 ## Phase 4: Media Pipeline
 

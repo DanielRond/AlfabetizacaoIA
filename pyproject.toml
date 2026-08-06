@@ -11,14 +11,15 @@ dependencies = [
     "loguru>=0.7.0",
     "requests>=2.31.0",
     "ollama>=0.6.2",
-
     "chromadb>=1.5.9",
-    "faster-whisper>=1.2.1",
     "gunicorn>=26.0.0",
     "google-genai>=2.8.0",
     "google>=3.0.0",
     "kokoro-onnx>=0.4.7",
     "soundfile>=0.12.1",
+    "torch>=2.13.0",
+    "torchaudio>=2.11.0",
+    "nemo-toolkit>=2.7.3",
 ]
 
 [project.optional-dependencies]
