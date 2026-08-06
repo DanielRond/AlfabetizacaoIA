@@ -22,6 +22,10 @@ O backend expõe uma API interna que recebe mensagens normalizadas de um conecto
 
 ```text
 AlfabetizacaoIA/
+├── apps/
+│   └── whatsapp-connector/      # Conector WhatsApp em Node.js (whatsapp-web.js)
+│       ├── src/                 # Sessão, normalização, envio e relay para a API
+│       └── tests/               # Testes node:test
 ├── src/curumim/
 │   ├── main.py                 # Aplicação Flask e rotas da API
 │   ├── logger_config.py        # Configuração do Loguru (console + arquivo)
@@ -52,6 +56,7 @@ AlfabetizacaoIA/
 
 * Python 3.11+ e [uv](https://docs.astral.sh/uv/)
 * [Ollama](https://ollama.com/) instalado (se usar geração local)
+* Node.js 18+ (para o conector WhatsApp)
 * (Opcional) Chave da API do Google Gemini
 
 ### 2. Instale as dependências
@@ -121,6 +126,49 @@ curl http://localhost:5000/health
 
 ---
 
+## Rodar com o Conector WhatsApp (Node)
+
+A arquitetura separa o transporte WhatsApp (Node) do processamento de IA (Python). O conector mantém a sessão, normaliza mensagens e as repassa ao backend via `POST /v1/messages/inbound` (contrato em `specs/002-whatsappjs-python-split/contracts/node-python-api.md`).
+
+### 1. Instale as dependências do conector
+
+```bash
+cd apps/whatsapp-connector
+npm install
+```
+
+### 2. Configure o ambiente do conector
+
+```bash
+cp .env.example .env
+```
+
+O conector lê primeiro `apps/whatsapp-connector/.env` e depois o `.env` da raiz do repositório.
+
+### 3. Inicie os dois serviços (em terminais separados)
+
+```bash
+# Terminal 1 - backend Python (veja a seção "Como Executar")
+uv run python -m curumim.main
+
+# Terminal 2 - conector WhatsApp
+cd apps/whatsapp-connector
+npm run start
+```
+
+Na primeira execução, um **QR code** aparece no terminal. Escaneie com o WhatsApp Web do telefone vinculado. Nas próximas execuções a sessão é restaurada automaticamente (`LocalAuth`).
+
+### 4. Testes do conector
+
+```bash
+cd apps/whatsapp-connector
+npm test
+```
+
+> **Observação**: ao rodar `npm install`, o download do Chromium pode ser pulado com `PUPPETEER_SKIP_DOWNLOAD=true`. Nesse caso, o conector usa o Chrome instalado na máquina via `puppeteer-core`.
+
+---
+
 ## Testes
 
 ```bash
@@ -146,10 +194,11 @@ uv run gunicorn -c deploy/gunicorn_config.py "curumim.main:create_app()"
 ## Tecnologias Utilizadas
 
 * **Backend**: Python 3, Flask, Gunicorn
+* **Conector WhatsApp**: Node.js, whatsapp-web.js, Pino, dotenv
 * **IA/ML**: Ollama (Llama 3.2) ou Google Gemini, NVIDIA NeMo Parakeet (STT), Kokoro (TTS), ChromaDB
 * **Banco de Dados**: SQLite + SQLAlchemy (relacional) e ChromaDB (vetorial)
-* **Observabilidade**: Loguru
-* **Gestão de Dependências**: `uv`
+* **Observabilidade**: Loguru (Python) e Pino (Node)
+* **Gestão de Dependências**: `uv` (Python) e `npm` (Node)
 * **Outros**: Python-dotenv, Requests
 
 ---

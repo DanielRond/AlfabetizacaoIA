@@ -43,3 +43,8 @@ hookdeck-config.json
 # Arquivos de áudio
 *.wav
 /models/
+
+# Conector WhatsApp (Node)
+apps/whatsapp-connector/node_modules/
+apps/whatsapp-connector/.wwebjs_auth/
+data/media_in/
