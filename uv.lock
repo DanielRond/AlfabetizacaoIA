@@ -179,7 +179,7 @@ dependencies = [
     { name = "torchaudio" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
 ]
@@ -195,7 +195,6 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "nemo-toolkit", specifier = ">=2.7.3" },
     { name = "ollama", specifier = ">=0.6.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "soundfile", specifier = ">=0.12.1" },
@@ -203,7 +202,9 @@ requires-dist = [
     { name = "torch", specifier = ">=2.13.0" },
     { name = "torchaudio", specifier = ">=2.11.0" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.0.0" }]
 
 [[package]]
 name = "annotated-doc"
