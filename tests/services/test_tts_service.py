@@ -1,3 +1,8 @@
+import subprocess
+
+import soundfile as sf
+
+from curumim.services import tts_service
 from curumim.services.tts_service import _limpar_texto_para_audio
 
 
@@ -56,3 +61,51 @@ def test_negrito_truncado_nao_quebra():
 
 def test_texto_vazio():
     assert _limpar_texto_para_audio("") == ""
+
+
+def test_tts_disponivel_false_sem_modelos(monkeypatch):
+    monkeypatch.setattr(tts_service, "KOKORO_MODEL_PATH", "nao/existe.onnx")
+    monkeypatch.setattr(tts_service, "KOKORO_VOICES_PATH", "nao/existe.bin")
+
+    assert tts_service.tts_disponivel() is False
+
+
+def test_sintetizar_fala_none_sem_modelo(monkeypatch):
+    monkeypatch.setattr(tts_service, "_carregar_kokoro", lambda: None)
+
+    assert tts_service.sintetizar_fala("olá") is None
+
+
+def test_sintetizar_fala_retorna_none_com_texto_vazio(monkeypatch):
+    monkeypatch.setattr(tts_service, "_carregar_kokoro", lambda: object())
+
+    assert tts_service.sintetizar_fala("**") is None
+
+
+def test_sintetizar_fala_gera_ogg(monkeypatch, tmp_path):
+    chamadas = {}
+
+    class FakeKokoro:
+        def create(self, texto, voice, speed, lang):
+            chamadas["texto"] = texto
+            return [[0.0, 0.1]], 24000
+
+    def fake_run(cmd, capture_output, check):
+        chamadas["cmd"] = cmd
+        with open(cmd[-1], "wb") as f:
+            f.write(b"fake-ogg")
+
+    monkeypatch.setattr(tts_service, "TEMP_DIR", str(tmp_path))
+    monkeypatch.setattr(tts_service, "_carregar_kokoro", lambda: FakeKokoro())
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(sf, "write", lambda *a, **k: None)
+
+    caminho = tts_service.sintetizar_fala("Olá, vamos aprender!")
+
+    assert caminho is not None
+    assert caminho.startswith(str(tmp_path))
+    assert caminho.endswith(".ogg")
+    assert chamadas["cmd"][0] == "ffmpeg"
+    assert "aprender" in chamadas["texto"]
+    assert len(list(tmp_path.glob("*.ogg"))) == 1
+    assert len(list(tmp_path.glob("*.wav"))) == 0
