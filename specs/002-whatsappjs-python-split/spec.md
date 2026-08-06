@@ -22,9 +22,9 @@ Como aluno, quero enviar texto ou audio e receber uma resposta adaptada ao meu n
 
 ### User Story 3 - Midia de resposta pelo Node
 
-Como aluno, quero que o sistema consiga responder com audio ou video quando a IA produzir esse tipo de saida, usando o Node para publicar a midia no WhatsApp.
+Como aluno, quero que o sistema consiga responder com audio quando a IA produzir esse tipo de saida, usando o Node para publicar a midia no WhatsApp.
 
-**Independent Test**: Receber uma resposta do backend que solicite envio de audio ou video e confirmar que o Node faz o envio na conta ativa do WhatsApp.
+**Independent Test**: Receber uma resposta do backend que solicite envio de audio e confirmar que o Node faz o envio na conta ativa do WhatsApp.
 
 ### User Story 4 - Resiliencia e fallback
 
@@ -40,7 +40,7 @@ Como operador, quero que falhas de rede, audio corrompido e erros de integracao 
 - **FR-002**: O Node MUST manter a sessao WhatsApp, receber mensagens e enviar respostas finais para o usuario.
 - **FR-003**: O backend Python MUST expor uma API interna para receber mensagens normalizadas e devolver a acao de resposta.
 - **FR-004**: O backend Python MUST continuar responsavel por perfil pedagogico, RAG, transcricao e geracao de resposta.
-- **FR-005**: O sistema MUST suportar respostas em texto, audio e video quando a IA ou a regra de negocio solicitar.
+- **FR-005**: O sistema MUST suportar respostas em texto e audio quando a IA ou a regra de negocio solicitar.
 - **FR-006**: O sistema MUST tratar audio incompreensivel com uma resposta gentil de novo envio.
 - **FR-007**: O sistema MUST registrar o historico minimo necessario para rastrear a interacao de ponta a ponta.
 - **FR-008**: O contrato Node -> Python MUST ser estavel e versionado para permitir evolucao independente.
@@ -52,7 +52,7 @@ Como operador, quero que falhas de rede, audio corrompido e erros de integracao 
 - **WhatsAppSession**: representa a sessao ativa do cliente Node, incluindo estado de login e reconexao.
 - **InboundMessage**: representa a mensagem recebida do WhatsApp, ja normalizada pelo Node.
 - **ProcessingResult**: representa a resposta do backend Python, com acao, conteudo, tipo de midia e metadados.
-- **MediaArtifact**: representa um arquivo de audio ou video gerado pelo backend para envio pelo Node.
+- **MediaArtifact**: representa um arquivo de audio gerado pelo backend para envio pelo Node.
 - **LearnerProfile**: representa o aluno e seu nivel pedagogico no backend Python.
 
 ## Success Criteria
@@ -66,4 +66,4 @@ Como operador, quero que falhas de rede, audio corrompido e erros de integracao 
 
 - O Node sera o ponto de contato com WhatsApp e o Python nao falara diretamente com a Meta.
 - O backend Python continuara usando Flask para a API interna, a menos que a equipe decida trocar isso em uma proposta separada.
-- Respostas em audio ou video podem ser entregues como caminho local, URL temporaria ou chave de storage, desde que o Node consiga publicar a midia.
+- Respostas em audio podem ser entregues como caminho local, URL temporaria ou chave de storage, desde que o Node consiga publicar a midia.

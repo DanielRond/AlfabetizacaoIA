@@ -20,11 +20,11 @@
 - A queue-based design, rejected for the first iteration because it adds operational overhead and makes local development harder.
 - Direct process-to-process calls, rejected because they make the two services harder to deploy and observe independently.
 
-## 3. Media handoff for audio and video
+## 3. Media handoff for audio
 
 **Decision**: Pass media as artifact references instead of large inline payloads.
 
-**Rationale**: Audio and video are too large for a clean JSON boundary in normal use. A file path, temporary URL, or storage key is easier to retry and inspect.
+**Rationale**: Audio is too large for a clean JSON boundary in normal use. A file path, temporary URL, or storage key is easier to retry and inspect.
 
 **Alternatives considered**:
 - Base64 in JSON, rejected because it inflates payload size and complicates retries.

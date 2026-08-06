@@ -22,7 +22,7 @@ Transformar a integracao atual em uma arquitetura com dois servicos: um Node ser
 
 **Performance Goals**: Keep message relay low latency, keep Python processing bounded for short text messages, and avoid large payloads crossing the Node/Python boundary
 
-**Constraints**: The WhatsApp transport must be session-based in Node; the Python service must not depend on the Meta Cloud API; secrets must stay in environment variables; audio and video should move through artifact references instead of large inline blobs
+**Constraints**: The WhatsApp transport must be session-based in Node; the Python service must not depend on the Meta Cloud API; secrets must stay in environment variables; audio should move through artifact references instead of large inline blobs
 
 **Scale/Scope**: Single active chatbot instance for development, with a path to later multi-instance deployment if needed
 
@@ -87,7 +87,7 @@ Expose the internal HTTP API in Python, accept normalized messages, run profile 
 
 ### Phase 4: Media Response Pipeline
 
-Add artifact handoff for audio and video responses so Python can generate the media and Node can publish it.
+Add artifact handoff for audio responses so Python can generate the media and Node can publish it.
 
 ### Phase 5: Hardening and Validation
 
@@ -98,5 +98,5 @@ Add contract tests, failure handling, and smoke tests for the end-to-end relay.
 1. Freeze the Node/Python API contract first.
 2. Build the Node connector to own login, receive, and send behavior.
 3. Move the Python service to an internal processing API.
-4. Add media artifact handoff for audio and video.
+4. Add media artifact handoff for audio.
 5. Finish with contract tests and a local development runbook.

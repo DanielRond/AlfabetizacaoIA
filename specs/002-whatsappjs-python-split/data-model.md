@@ -21,7 +21,7 @@ Represents a message received by the Node transport and forwarded to Python.
 **Fields**
 - `message_id`: transport message identifier
 - `phone_number`: sender number
-- `message_type`: `text`, `audio`, `video`, `interactive`, `system`
+- `message_type`: `text`, `audio`, `interactive`, `system`
 - `text`: normalized text when available
 - `media_ref`: local path, temporary URL, or storage key when the message includes media
 - `received_at`: timestamp
@@ -32,20 +32,20 @@ Represents the instruction returned by Python to the Node transport.
 
 **Fields**
 - `correlation_id`: shared trace id
-- `action`: `send_text`, `send_audio`, `send_video`, `request_retry`, `noop`
+- `action`: `send_text`, `send_audio`, `request_retry`, `noop`
 - `text`: final text to send when applicable
-- `media_ref`: artifact reference for audio or video replies
-- `media_type`: `audio` or `video`
+- `media_ref`: artifact reference for audio replies
+- `media_type`: `audio`
 - `status`: `ok`, `retry`, `error`
 - `error_code`: optional failure classification
 
 ### MediaArtifact
-Represents a generated audio or video file prepared by Python for delivery by Node.
+Represents a generated audio file prepared by Python for delivery by Node.
 
 **Fields**
 - `id`: internal identifier
 - `profile_id`: foreign key to `LearnerProfile`
-- `artifact_type`: `audio` or `video`
+- `artifact_type`: `audio`
 - `local_path`: file path or shared storage key
 - `mime_type`: content type
 - `status`: `pending`, `ready`, `sent`, `failed`

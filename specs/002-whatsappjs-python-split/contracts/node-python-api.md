@@ -17,7 +17,7 @@ Define the internal HTTP contract between the Node WhatsApp connector and the Py
 - `correlation_id`: shared trace identifier
 - `message_id`: transport message identifier
 - `phone_number`: sender number
-- `message_type`: `text`, `audio`, `video`, `interactive`, `system`
+- `message_type`: `text`, `audio`, `interactive`, `system`
 - `text`: normalized text when available
 - `media_ref`: file path, temporary URL, or storage key when media is present
 - `received_at`: ISO timestamp
@@ -34,10 +34,10 @@ Define the internal HTTP contract between the Node WhatsApp connector and the Py
 ### Response fields
 
 - `correlation_id`: same value sent by Node
-- `action`: `send_text`, `send_audio`, `send_video`, `request_retry`, `noop`
+- `action`: `send_text`, `send_audio`, `request_retry`, `noop`
 - `text`: final text reply when relevant
 - `media_ref`: generated artifact reference when relevant
-- `media_type`: `audio` or `video`
+- `media_type`: `audio`
 - `status`: `ok`, `retry`, `error`
 - `error_code`: optional structured failure code
 

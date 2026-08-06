@@ -8,10 +8,10 @@
 
 **Goal**: Define the split architecture, environment variables, and the first version of the Node -> Python contract.
 
-- [ ] T001 Create the new spec folder and align the branch goals in spec.md, plan.md, research.md, data-model.md, quickstart.md, and contracts/node-python-api.md
-- [ ] T002 Define the internal API request and response envelope between Node and Python
-- [ ] T003 Add environment variables for Python API URL, WhatsApp session storage, and shared media storage
-- [ ] T004 Decide the local artifact flow for audio and video replies
+- [X] T001 Create the new spec folder and align the branch goals in spec.md, plan.md, research.md, data-model.md, quickstart.md, and contracts/node-python-api.md
+- [X] T002 Define the internal API request and response envelope between Node and Python
+- [X] T003 Add environment variables for Python API URL, WhatsApp session storage, and shared media storage
+- [X] T004 Decide the local artifact flow for audio replies
 
 ## Phase 2: Node Transport Layer
 
@@ -19,8 +19,8 @@
 
 - [ ] T005 Initialize the Node connector workspace and runtime scripts
 - [ ] T006 Implement WhatsApp session management and QR login flow
-- [ ] T007 Normalize inbound text, audio, video, and interactive replies into the internal contract
-- [ ] T008 Implement outbound send logic for text, audio, and video responses
+- [ ] T007 Normalize inbound text, audio, and interactive replies into the internal contract
+- [ ] T008 Implement outbound send logic for text and audio responses
 
 ## Phase 3: Python Processing API
 
@@ -33,10 +33,10 @@
 
 ## Phase 4: Media Pipeline
 
-**Goal**: Allow Python to generate audio or video replies while Node delivers the final media.
+**Goal**: Allow Python to generate audio replies while Node delivers the final media.
 
 - [ ] T013 Define media artifact generation and cleanup rules
-- [ ] T014 Add audio and video response builders in Python
+- [ ] T014 Add audio response builders in Python
 - [ ] T015 Add Node handling for media references and delivery acknowledgements
 
 ## Phase 5: Hardening and Validation
@@ -53,5 +53,5 @@
 1. Freeze the contract first.
 2. Build the Node relay next.
 3. Move the Python processing API behind the contract.
-4. Add audio and video media delivery.
+4. Add audio media delivery.
 5. Finish with tests and smoke validation.
