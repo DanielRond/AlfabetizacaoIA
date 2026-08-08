@@ -1,0 +1,13 @@
+{
+  "correlation_id": "contract-test-0001",
+  "message_id": "CONTRACTMSG0001",
+  "phone_number": "5591999999999",
+  "message_type": "text",
+  "text": "o que e a lenda da cobra grande?",
+  "media_ref": null,
+  "received_at": "2026-08-07T12:00:00Z",
+  "metadata": {
+    "chat_id": "5591999999999@c.us",
+    "from_me": false
+  }
+}

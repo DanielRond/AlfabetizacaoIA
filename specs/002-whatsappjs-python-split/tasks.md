@@ -17,10 +17,10 @@
 
 **Goal**: Make the Node service own login, inbound relay, and outbound sending.
 
-- [ ] T005 Initialize the Node connector workspace and runtime scripts
-- [ ] T006 Implement WhatsApp session management and QR login flow
-- [ ] T007 Normalize inbound text, audio, and interactive replies into the internal contract
-- [ ] T008 Implement outbound send logic for text and audio responses
+- [X] T005 Initialize the Node connector workspace and runtime scripts
+- [X] T006 Implement WhatsApp session management and QR login flow
+- [X] T007 Normalize inbound text, audio, and interactive replies into the internal contract
+- [X] T008 Implement outbound send logic for text and audio responses
 
 ## Phase 3: Python Processing API
 
@@ -35,18 +35,18 @@
 
 **Goal**: Allow Python to generate audio replies while Node delivers the final media.
 
-- [ ] T013 Define media artifact generation and cleanup rules
-- [ ] T014 Add audio response builders in Python
-- [ ] T015 Add Node handling for media references and delivery acknowledgements
+- [X] T013 Define media artifact generation and cleanup rules
+- [X] T014 Add audio response builders in Python
+- [X] T015 Add Node handling for media references and delivery acknowledgements
 
 ## Phase 5: Hardening and Validation
 
 **Goal**: Close the contract gaps and prove the end-to-end flow locally.
 
-- [ ] T016 Add contract tests for the Node -> Python API
-- [ ] T017 Add integration tests for the happy path and fallback path
-- [ ] T018 Add retry handling and structured logging for both services
-- [ ] T019 Update quickstart notes with the dual-service run instructions
+- [X] T016 Add contract tests for the Node -> Python API
+- [X] T017 Add integration tests for the happy path and fallback path
+- [X] T018 Add retry handling and structured logging for both services
+- [X] T019 Update quickstart notes with the dual-service run instructions
 
 ## Execution Order
 

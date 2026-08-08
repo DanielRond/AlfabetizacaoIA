@@ -1,0 +1,9 @@
+{
+  "correlation_id": "contract-test-0001",
+  "action": "send_text",
+  "text": "Resposta pedagogica de teste.",
+  "media_ref": null,
+  "media_type": null,
+  "status": "ok",
+  "error_code": null
+}

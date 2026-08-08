@@ -64,11 +64,11 @@ apps/
     └── tests/
 
 src/
-└── alfabot/
-    ├── app.py
+└── curumim/
+    ├── main.py
+    ├── models/
     ├── services/
-    ├── infra/
-    └── prompts/
+    └── logger_config.py
 ```
 
 ## Delivery Phases

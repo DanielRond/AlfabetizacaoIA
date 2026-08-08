@@ -28,6 +28,7 @@ Configure at least:
 - `PYTHON_API_URL`
 - `WHATSAPP_SESSION_DIR`
 - `WHATSAPP_MEDIA_DIR`
+- `MEDIA_RETENTION_HOURS` (default 24)
 - `OLLAMA_API_URL`
 - `OLLAMA_MODEL`
 - `GEMINI_API_KEY` if applicable
@@ -35,7 +36,7 @@ Configure at least:
 ## Run the backend
 
 ```bash
-uv run python -m src.alfabot.main
+uv run python -m curumim.main
 ```
 
 ## Run the WhatsApp connector
