@@ -6,13 +6,15 @@ mensagens normalizadas do conector Node.js e retornando instruções estruturada
 """
 
 import os
+import json
 from typing import Tuple
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, Response
 from dotenv import load_dotenv
 from curumim.logger_config import logger
 
 # Importações internas
-from curumim.models.database import SessionLocal, LearnerProfile, ChatMessage, inicializar_banco
+from curumim.models.database import SessionLocal, LearnerProfile, ChatMessage, MediaArtifact, InteractionRecord, inicializar_banco
 from curumim.services.ai_service import gerar_resposta_ia
 from curumim.services.stt_service import transcrever_audio
 from curumim.services.tts_service import sintetizar_fala, tts_disponivel
@@ -31,6 +33,7 @@ def create_app() -> Flask:
 
     # Registro das rotas da API interna (Contrato Node <-> Python)
     app_instance.add_url_rule('/v1/messages/inbound', 'handle_inbound_message', handle_inbound_message, methods=['POST'])
+    app_instance.add_url_rule('/v1/messages/delivered', 'handle_message_delivered', handle_message_delivered, methods=['POST'])
     app_instance.add_url_rule('/health', 'health_check', health_check, methods=['GET'])
     app_instance.add_url_rule('/v1/health', 'health_check_v1', health_check, methods=['GET'])
 
@@ -161,8 +164,11 @@ def handle_inbound_message() -> Tuple[Response, int]:
                     action = "send_audio"
                     audio_artifact_ref = caminho_tts
                     media_type = "audio"
+                    _registrar_artefato_audio(phone_number, caminho_tts)
             except Exception as e:
                 logger.error(f"Erro ao sintetizar áudio de resposta para {phone_number}: {e}")
+
+        _registrar_interacao(phone_number, correlation_id, data, resposta_ia, action)
 
         # 5. Retorno do ProcessingResult estruturado para o Node.js
         return jsonify({
@@ -188,6 +194,63 @@ def handle_inbound_message() -> Tuple[Response, int]:
         }), 500
 
 
+def handle_message_delivered() -> Tuple[Response, int]:
+    """
+    Endpoint de confirmação de entrega (POST /v1/messages/delivered).
+    O Node confirma se a resposta (texto/áudio) foi entregue ou falhou.
+    """
+    data = request.get_json(silent=True) or {}
+    correlation_id = data.get("correlation_id")
+    status = data.get("status")  # 'delivered' | 'failed'
+    action = data.get("action")
+    media_ref = data.get("media_ref")
+
+    if not correlation_id or status not in ("delivered", "failed"):
+        logger.warning(f"[Delivered] Payload inválido recebido: {data}")
+        return jsonify({"status": "error"}), 400
+
+    logger.info(f"[Delivered] Correlação: {correlation_id} | Status: {status} | Action: {action}")
+
+    try:
+        with SessionLocal() as session:
+            perfil = None
+            interacao = session.query(InteractionRecord).filter_by(correlation_id=correlation_id).first()
+            if interacao:
+                perfil = session.query(LearnerProfile).filter_by(id=interacao.profile_id).first()
+
+            if perfil is None and data.get("phone_number"):
+                perfil = session.query(LearnerProfile).filter_by(phone_number=data.get("phone_number")).first()
+
+            if perfil is None:
+                return jsonify({"status": "ok"}), 200
+
+            novo_status = 'sent' if status == 'delivered' else 'failed'
+            session.add(InteractionRecord(
+                profile_id=perfil.id,
+                correlation_id=correlation_id,
+                direction='outbound',
+                payload_snapshot=json.dumps(data, ensure_ascii=False),
+                response_text=data.get("error") or data.get("text") or "",
+                status=novo_status,
+            ))
+
+            if action == 'send_audio' and media_ref:
+                artefato = (
+                    session.query(MediaArtifact)
+                    .filter_by(profile_id=perfil.id, local_path=media_ref)
+                    .order_by(MediaArtifact.id.desc())
+                    .first()
+                )
+                if artefato:
+                    artefato.status = novo_status
+
+            session.commit()
+    except Exception as e:
+        logger.error(f"[Delivered] Erro ao registrar entrega: {e}")
+
+    return jsonify({"status": "ok"}), 200
+
+
 # --- REGRAS DE NEGÓCIO E AUXILIARES ---
 
 def _processar_negocio_ia(numero: str, texto: str, veio_como_audio: bool) -> Tuple[str, str, bool]:
@@ -198,6 +261,8 @@ def _processar_negocio_ia(numero: str, texto: str, veio_como_audio: bool) -> Tup
             aluno = LearnerProfile(phone_number=numero, pedagogical_level='iniciante', onboarding_state='new')
             session.add(aluno)
             session.commit()
+
+        aluno.last_seen_at = datetime.now(timezone.utc)
 
         tipo_msg = 'audio' if veio_como_audio else 'text'
 
@@ -300,6 +365,45 @@ def deve_incluir_audio(nivel_pedagogico: str, veio_como_audio: bool) -> bool:
     if nivel_pedagogico == "basico":
         return veio_como_audio  # mantém o formato que o aluno usou
     return False  # intermediário+ foca em texto
+
+
+def _registrar_interacao(numero: str, correlation_id: str, payload: dict, resposta: str, action: str):
+    """Registra um InteractionRecord de entrada para rastreio ponta a ponta."""
+    try:
+        with SessionLocal() as session:
+            aluno = session.query(LearnerProfile).filter_by(phone_number=numero).first()
+            if aluno is None:
+                return
+            session.add(InteractionRecord(
+                profile_id=aluno.id,
+                correlation_id=correlation_id,
+                direction='inbound',
+                payload_snapshot=json.dumps(payload, ensure_ascii=False, default=str),
+                response_text=resposta,
+                status='processed' if action != 'error' else 'failed',
+            ))
+            session.commit()
+    except Exception as e:
+        logger.error(f"Erro ao registrar InteractionRecord para {numero}: {e}")
+
+
+def _registrar_artefato_audio(numero: str, caminho: str):
+    """Registra um MediaArtifact 'ready' para um áudio TTS gerado pelo backend."""
+    try:
+        with SessionLocal() as session:
+            aluno = session.query(LearnerProfile).filter_by(phone_number=numero).first()
+            if aluno is None:
+                return
+            session.add(MediaArtifact(
+                profile_id=aluno.id,
+                artifact_type='audio',
+                local_path=caminho,
+                mime_type='audio/ogg',
+                status='ready',
+            ))
+            session.commit()
+    except Exception as e:
+        logger.error(f"Erro ao registrar MediaArtifact para {numero}: {e}")
 
 
 # --- INICIALIZAÇÃO ---

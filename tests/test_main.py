@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import curumim.main as main_module
-from curumim.models.database import Base, LearnerProfile, ChatMessage
+from curumim.models.database import Base, LearnerProfile, ChatMessage, InteractionRecord, MediaArtifact
 
 
 @pytest.fixture
@@ -161,6 +161,22 @@ def test_audio_sem_arquivo_retorna_request_retry(client):
     assert data["error_code"] == "MEDIA_FILE_NOT_FOUND"
 
 
+def test_audio_corrompido_retorna_request_retry(client, tmp_path):
+    audio = tmp_path / "corrompido.ogg"
+    audio.write_bytes(b"nao-eh-ogg-valido")
+
+    with patch("curumim.main.transcrever_audio", side_effect=RuntimeError("arquivo inválido")):
+        resp = client.post(
+            "/v1/messages/inbound",
+            json=_payload(message_type="audio", media_ref=str(audio)),
+        )
+
+    data = resp.get_json()
+    assert data["action"] == "request_retry"
+    assert data["status"] == "retry"
+    assert data["error_code"] == "AUDIO_TRANSCRIPTION_FAILED"
+
+
 @patch("curumim.main.gerar_resposta_ia", return_value="Resposta com áudio.")
 @patch("curumim.main.sintetizar_fala")
 @patch("curumim.main.tts_disponivel", return_value=True)
@@ -209,3 +225,128 @@ def test_imagem_retorna_recusa_amigavel(client, db_session_factory):
         aluno = session.query(LearnerProfile).filter_by(phone_number="5591999999999").first()
         assert aluno is not None
         assert session.query(ChatMessage).filter_by(learner_id=aluno.id).count() == 2
+
+
+def test_inbound_registra_interaction_record(client, db_session_factory):
+    resp = client.post("/v1/messages/inbound", json=_payload(text="qual a capital do pará?"))
+
+    assert resp.status_code == 200
+
+    with db_session_factory() as session:
+        aluno = session.query(LearnerProfile).filter_by(phone_number="5591999999999").first()
+        assert aluno is not None
+        registro = (
+            session.query(InteractionRecord)
+            .filter_by(profile_id=aluno.id, direction="inbound")
+            .order_by(InteractionRecord.id.desc())
+            .first()
+        )
+        assert registro is not None
+        assert registro.correlation_id == "trace-1"
+        assert registro.status == "processed"
+
+
+def test_audio_gera_media_artifact_e_delivered_marca_sent(
+    client, db_session_factory, tmp_path
+):
+    aluno_id = _criar_aluno(db_session_factory, level="iniciante")
+
+    entrada = tmp_path / "in.ogg"
+    saida = tmp_path / "tts_out.ogg"
+    entrada.write_bytes(b"fake")
+    saida.write_bytes(b"fake")
+
+    with patch("curumim.main.sintetizar_fala", return_value=str(saida)), patch(
+        "curumim.main.tts_disponivel", return_value=True
+    ), patch("curumim.main.transcrever_audio", return_value="uma frase"):
+        resp = client.post(
+            "/v1/messages/inbound",
+            json=_payload(message_type="audio", media_ref=str(entrada)),
+        )
+
+    data = resp.get_json()
+    assert data["action"] == "send_audio"
+    assert data["media_ref"] == str(saida)
+
+    with db_session_factory() as session:
+        artefato = (
+            session.query(MediaArtifact)
+            .filter_by(profile_id=aluno_id, local_path=str(saida))
+            .first()
+        )
+        assert artefato is not None
+        assert artefato.status == "ready"
+        assert artefato.artifact_type == "audio"
+
+    # Simula a confirmação de entrega do Node
+    resp = client.post(
+        "/v1/messages/delivered",
+        json={
+            "correlation_id": "trace-1",
+            "message_id": "msg-1",
+            "phone_number": "5591999999999",
+            "action": "send_audio",
+            "status": "delivered",
+            "media_ref": str(saida),
+            "delivered_at": "2026-08-06T12:00:05Z",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json() == {"status": "ok"}
+
+    with db_session_factory() as session:
+        artefato = (
+            session.query(MediaArtifact)
+            .filter_by(profile_id=aluno_id, local_path=str(saida))
+            .first()
+        )
+        assert artefato.status == "sent"
+
+        outbound = (
+            session.query(InteractionRecord)
+            .filter_by(profile_id=aluno_id, direction="outbound", correlation_id="trace-1")
+            .first()
+        )
+        assert outbound is not None
+        assert outbound.status == "sent"
+
+
+def test_delivered_payload_invalido_retorna_400(client):
+    resp = client.post("/v1/messages/delivered", json={"correlation_id": "x"})
+    assert resp.status_code == 400
+    assert resp.get_json() == {"status": "error"}
+
+
+def test_delivered_sem_perfil_retorna_ok(client):
+    resp = client.post(
+        "/v1/messages/delivered",
+        json={
+            "correlation_id": "trace-inexistente",
+            "phone_number": "5599999999999",
+            "action": "send_text",
+            "status": "delivered",
+            "delivered_at": "2026-08-06T12:00:05Z",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json() == {"status": "ok"}
+
+
+def test_migracao_e_idempotente(tmp_path):
+    from sqlalchemy import create_engine, inspect
+
+    import curumim.models.database as database_module
+
+    db_path = tmp_path / "migracao.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    database_module.Base.metadata.create_all(engine)
+    database_module._adicionar_coluna_se_faltar(engine, "learner_profiles", "display_name", "VARCHAR")
+    database_module._adicionar_coluna_se_faltar(engine, "learner_profiles", "last_seen_at", "DATETIME")
+
+    colunas = {c["name"] for c in inspect(engine).get_columns("learner_profiles")}
+    assert {"display_name", "last_seen_at"} <= colunas
+
+    database_module._adicionar_coluna_se_faltar(engine, "learner_profiles", "display_name", "VARCHAR")
+
+    colunas2 = {c["name"] for c in inspect(engine).get_columns("learner_profiles")}
+    assert colunas2 == colunas
