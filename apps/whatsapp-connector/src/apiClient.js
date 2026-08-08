@@ -66,6 +66,31 @@ async function postInbound(payload, opts = {}) {
   throw lastError;
 }
 
+// Fire-and-forget: confirma entrega ao backend. Nunca lança.
+async function postDelivered(payload, opts = {}) {
+  const url = `${opts.pythonApiUrl || config.pythonApiUrl}/v1/messages/delivered`;
+  const timeoutMs = opts.timeoutMs || 5000;
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetchImpl(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      return res.ok ? res.status : null;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
+}
+
 async function checkHealth(opts = {}) {
   const url = `${opts.pythonApiUrl || config.pythonApiUrl}/health`;
   const timeoutMs = opts.timeoutMs || 5000;
@@ -85,4 +110,4 @@ async function checkHealth(opts = {}) {
   }
 }
 
-module.exports = { postInbound, checkHealth };
+module.exports = { postInbound, postDelivered, checkHealth };
