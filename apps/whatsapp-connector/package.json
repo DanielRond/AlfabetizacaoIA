@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test \"tests/*.test.js\""
+    "test": "node --test tests/"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

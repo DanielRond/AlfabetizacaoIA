@@ -26,7 +26,9 @@ def _rag_tem_documentos() -> bool:
 def _ia_provedor_disponivel() -> bool:
     if ai_service.PROVIDER == "gemini":
         chave = os.getenv("GEMINI_API_KEY", "")
-        return len(chave) >= 30 and chave.startswith("AIza")
+        # Aceita chaves de API (AIza...) e tokens OAuth (AQ...): a validade é
+        # confirmada pelo próprio teste, que falha se a chamada real falhar.
+        return len(chave) >= 20
     url = ai_service.OLLAMA_URL.replace("/api/generate", "/api/tags")
     try:
         requests.get(url, timeout=5).raise_for_status()
