@@ -43,4 +43,22 @@ function resolveMediaRef(mediaBaseDir, mediaRef) {
   return path.isAbsolute(mediaRef) ? mediaRef : path.resolve(mediaBaseDir, mediaRef);
 }
 
-module.exports = { saveInboundMedia, resolveMediaRef, safeFilename, ensureDir };
+// Remove arquivos de mídia antigos do diretório (limite em ms de idade).
+async function limparMediaAntiga(dir, maxAgeMs) {
+  const entries = await fs.readdir(dir).catch(() => []);
+  let removed = 0;
+  const now = Date.now();
+
+  for (const name of entries) {
+    const filePath = path.join(dir, name);
+    const st = await fs.stat(filePath).catch(() => null);
+    if (st && st.isFile() && now - st.mtimeMs > maxAgeMs) {
+      const ok = await fs.unlink(filePath).then(() => true).catch(() => false);
+      if (ok) removed += 1;
+    }
+  }
+
+  return removed;
+}
+
+module.exports = { saveInboundMedia, resolveMediaRef, safeFilename, ensureDir, limparMediaAntiga };

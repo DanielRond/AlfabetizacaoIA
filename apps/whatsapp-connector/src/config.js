@@ -18,6 +18,8 @@ const config = {
   sessionDir: path.resolve(workspaceRoot, process.env.WHATSAPP_SESSION_DIR || '.wwebjs_auth'),
   mediaDir: path.resolve(repoRoot, process.env.WHATSAPP_MEDIA_DIR || 'data/media_in'),
   mediaBaseDir: process.env.MEDIA_BASE_DIR ? path.resolve(process.env.MEDIA_BASE_DIR) : repoRoot,
+  mediaRetentionMs: Number(process.env.MEDIA_RETENTION_HOURS || 24) * 3600 * 1000,
+  browserPath: process.env.WHATSAPP_BROWSER_PATH || null,
   logLevel: process.env.LOG_LEVEL || 'info',
   requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS || 120000),
   retries: Number(process.env.REQUEST_RETRIES || 2),

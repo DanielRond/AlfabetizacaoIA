@@ -12,12 +12,18 @@ function printQr(qr) {
 function buildClient(onMessage) {
   const log = childLogger();
 
+  const puppeteer = {
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  };
+
+  if (config.browserPath) {
+    puppeteer.executablePath = config.browserPath;
+  }
+
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: config.sessionDir }),
-    puppeteer: {
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
+    puppeteer,
   });
 
   client.on('qr', (qr) => {

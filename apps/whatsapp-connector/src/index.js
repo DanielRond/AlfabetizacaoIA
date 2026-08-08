@@ -3,7 +3,9 @@
 const { buildClient } = require('./session');
 const { handleInboundMessage } = require('./handlers');
 const { checkHealth } = require('./apiClient');
+const { limparMediaAntiga } = require('./media');
 const { childLogger } = require('./logger');
+const config = require('./config');
 
 const log = childLogger();
 
@@ -44,6 +46,15 @@ function scheduleRestart(reason) {
 async function start() {
   if (shuttingDown) {
     return;
+  }
+
+  try {
+    const removidos = await limparMediaAntiga(config.mediaDir, config.mediaRetentionMs);
+    if (removidos > 0) {
+      log.info({ removidos }, 'Mídia antiga removida do diretório de entrada.');
+    }
+  } catch (err) {
+    log.warn({ err: err.message }, 'Falha na limpeza de mídia antiga.');
   }
 
   client = buildClient(handleInboundMessage);

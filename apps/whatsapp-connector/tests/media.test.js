@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
-const { saveInboundMedia, resolveMediaRef, safeFilename } = require('../src/media');
+const { saveInboundMedia, resolveMediaRef, safeFilename, limparMediaAntiga } = require('../src/media');
 
 test('safeFilename sanitiza nomes não seguros', () => {
   assert.equal(safeFilename('mensagem da criança.ogg'), 'mensagem_da_crian_a.ogg');
@@ -15,7 +15,7 @@ test('safeFilename sanitiza nomes não seguros', () => {
 });
 
 test('resolveMediaRef mantém caminho absoluto como está', () => {
-  const abs = path.join('C:', 'temp', 'audio.ogg');
+  const abs = path.join(os.tmpdir(), 'temp', 'audio.ogg');
   assert.equal(resolveMediaRef('/base', abs), abs);
 });
 
@@ -75,4 +75,30 @@ test('saveInboundMedia lança erro sem downloadMedia', async () => {
 test('saveInboundMedia lança erro quando a mídia vem vazia', async () => {
   const message = { async downloadMedia() { return { data: null }; } };
   await assert.rejects(() => saveInboundMedia(message, 'qualquer'), /sem dados/);
+});
+
+test('limparMediaAntiga remove apenas arquivos antigos', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'connector-media-clean-'));
+  try {
+    const velho = path.join(dir, 'velho.ogg');
+    const novo = path.join(dir, 'novo.ogg');
+    await fs.writeFile(velho, 'x');
+    await fs.writeFile(novo, 'x');
+
+    const passado = new Date(Date.now() - 2 * 3600 * 1000);
+    await fs.utimes(velho, passado, passado);
+
+    const removed = await limparMediaAntiga(dir, 3600 * 1000);
+
+    assert.equal(removed, 1);
+    await assert.rejects(() => fs.access(velho));
+    await fs.access(novo);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('limparMediaAntiga não falha com diretório ausente', async () => {
+  const dir = path.join(os.tmpdir(), 'nao-existe-' + Date.now());
+  assert.equal(await limparMediaAntiga(dir, 1000), 0);
 });
