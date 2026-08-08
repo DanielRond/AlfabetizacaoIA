@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import subprocess
 import uuid
 import threading
@@ -15,6 +16,7 @@ TTS_ENABLED = os.getenv("TTS_ENABLED", "true").lower() == "true"
 TTS_VOICE = os.getenv("TTS_VOICE", "pf_dora")
 KOKORO_MODEL_PATH = os.getenv("KOKORO_MODEL_PATH", "models/kokoro-v1.0.onnx")
 KOKORO_VOICES_PATH = os.getenv("KOKORO_VOICES_PATH", "models/voices-v1.0.bin")
+MEDIA_RETENTION_HOURS = float(os.getenv("MEDIA_RETENTION_HOURS", "24"))
 ESPEAK_LIB_PATH = "/lib/x86_64-linux-gnu/libespeak-ng.so.1"
 ESPEAK_DATA_PATH = "/usr/lib/x86_64-linux-gnu/espeak-ng-data"
 
@@ -84,8 +86,32 @@ def tts_disponivel() -> bool:
     return TTS_ENABLED and os.path.exists(KOKORO_MODEL_PATH) and os.path.exists(KOKORO_VOICES_PATH)
 
 
+def limpar_artefatos_antigos(pasta: str | None = None, max_idade_horas: float | None = None) -> int:
+    """Remove arquivos de mídia com mtime mais antigo que o limite de retenção."""
+    pasta = pasta or TEMP_DIR
+    limite = max_idade_horas if max_idade_horas is not None else MEDIA_RETENTION_HOURS
+    if not os.path.isdir(pasta):
+        return 0
+
+    agora = time.time()
+    removidos = 0
+    for nome in os.listdir(pasta):
+        caminho = os.path.join(pasta, nome)
+        try:
+            if os.path.isfile(caminho) and agora - os.path.getmtime(caminho) > limite * 3600:
+                os.remove(caminho)
+                removidos += 1
+        except OSError:
+            continue
+
+    if removidos:
+        logger.info(f"{removidos} artefato(s) antigo(s) removido(s) de {pasta}")
+    return removidos
+
+
 def sintetizar_fala(texto: str) -> str | None:
     """Gera um .ogg (Opus) a partir do texto. Retorna o caminho, ou None em qualquer falha."""
+    limpar_artefatos_antigos()
     kokoro = _carregar_kokoro()
     if kokoro is None:
         return None

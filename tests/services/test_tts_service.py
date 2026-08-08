@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 import soundfile as sf
 
@@ -109,3 +110,48 @@ def test_sintetizar_fala_gera_ogg(monkeypatch, tmp_path):
     assert "aprender" in chamadas["texto"]
     assert len(list(tmp_path.glob("*.ogg"))) == 1
     assert len(list(tmp_path.glob("*.wav"))) == 0
+
+
+def test_limpar_artefatos_antigos_remove_apenas_antigos(monkeypatch, tmp_path):
+    antigo = tmp_path / "antigo.ogg"
+    recente = tmp_path / "recente.ogg"
+    antigo.write_bytes(b"x")
+    recente.write_bytes(b"x")
+
+    import os
+
+    hora_antiga = time.time() - 2 * 3600
+    os.utime(antigo, (hora_antiga, hora_antiga))
+
+    removidos = tts_service.limpar_artefatos_antigos(str(tmp_path), max_idade_horas=1)
+
+    assert removidos == 1
+    assert not antigo.exists()
+    assert recente.exists()
+
+
+def test_limpar_artefatos_antigos_ignora_pasta_ausente(tmp_path):
+    assert tts_service.limpar_artefatos_antigos(str(tmp_path / "nao-existe"), max_idade_horas=1) == 0
+
+
+def test_sintetizar_fala_limpa_artefatos_antigos(monkeypatch, tmp_path):
+    chamadas = {}
+
+    class FakeKokoro:
+        def create(self, texto, voice, speed, lang):
+            chamadas["texto"] = texto
+            return [[0.0, 0.1]], 24000
+
+    def fake_run(cmd, capture_output, check):
+        with open(cmd[-1], "wb") as f:
+            f.write(b"fake-ogg")
+
+    monkeypatch.setattr(tts_service, "TEMP_DIR", str(tmp_path))
+    monkeypatch.setattr(tts_service, "_carregar_kokoro", lambda: FakeKokoro())
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(sf, "write", lambda *a, **k: None)
+    monkeypatch.setattr(tts_service, "limpar_artefatos_antigos", lambda *a, **k: 1)
+
+    caminho = tts_service.sintetizar_fala("Olá")
+
+    assert caminho is not None
