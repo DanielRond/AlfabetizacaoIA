@@ -17,6 +17,7 @@ para aprofundamento.
 | [`07-modulos-python.md`](07-modulos-python.md) | Walkthrough do backend Python (`src/curumim/`) |
 | [`08-decisoes.md`](08-decisoes.md) | Decisões arquiteturais (ADRs) e rationale por trás das escolhas |
 | [`09-operacao.md`](09-operacao.md) | Variáveis de ambiente, setup, execução, deploy e testes |
+| [`10-plano-teste-servicos.md`](10-plano-teste-servicos.md) | Plano pendente do teste manual STT + IA + TTS via Gemini |
 
 ## Como usar
 
