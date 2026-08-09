@@ -18,7 +18,7 @@ dependencies = [
     "soundfile>=0.12.1",
     "torch>=2.13.0",
     "torchaudio>=2.11.0",
-    "nemo-toolkit>=2.7.3",
+    "nemo-toolkit[asr]>=2.7.3",
 ]
 
 [dependency-groups]
