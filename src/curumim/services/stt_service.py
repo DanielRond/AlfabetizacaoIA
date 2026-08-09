@@ -60,10 +60,13 @@ def transcrever_audio(caminho_arquivo: str) -> str:
             transcriptions = modelo.transcribe([caminho_arquivo], batch_size=1)
 
         # O formato de retorno do NeMo pode vir encapsulado numa lista/tupla
+        # e, a partir do NeMo 2.x, os resultados são objetos Hypothesis.
         if transcriptions:
             texto_resultado = transcriptions[0]
             if isinstance(texto_resultado, list):
                 texto_resultado = texto_resultado[0]
+            if hasattr(texto_resultado, "text"):
+                texto_resultado = texto_resultado.text
             
             texto_limpo = str(texto_resultado).strip()
             logger.info(f"Transcrição concluída com sucesso ({len(texto_limpo)} caracteres).")
