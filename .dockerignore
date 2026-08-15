@@ -1,0 +1,55 @@
+# =====================================================================
+# .dockerignore — contexto de build dos containers do Curumim Marajoara
+#
+# O que NÃO vai para o build context (mantém o contexto pequeno e evita
+# vazar dados locais, segredos e dependências já instaladas no host).
+#
+# ATENÇÃO: deploy/data é mantido de propósito — é a fonte do
+# conhecimento cultural (deploy/data/knowledge/marajo.txt), copiada
+# para /app/data/knowledge no Dockerfile.backend.
+# =====================================================================
+
+# ---- Controle de versão ----
+.git
+.gitignore
+
+# ---- Segredos e ambientes locais (nunca vão para a imagem) ----
+.env
+.env.local
+**/.env
+**/.env.local
+# (.env.example continua no contexto: é a referência documentada)
+
+# ---- Ambientes virtuais e dependências do host ----
+.venv
+venv
+node_modules
+**/node_modules
+__pycache__
+**/__pycache__
+*.pyc
+.pytest_cache
+
+# ---- Dados de runtime (gerados em execução, não fazem parte da imagem) ----
+# /data, /models, /logs e /src/data são caminhos CWD-relativos do backend;
+# /apps/.../.wwebjs_auth é a sessão WhatsApp local do conector.
+/data
+/models
+/logs
+/src/data
+**/.wwebjs_auth
+
+# ---- Artefatos de banco e vetorial ----
+*.db
+*.sqlite3
+chroma_db
+**/chroma_db
+
+# ---- Ferramentas e documentação (desnecessárias no build) ----
+.opencode
+docs/
+tests/
+specs/
+
+# ---- Versão do Python controlada pela imagem base (python:3.12) ----
+.python-version

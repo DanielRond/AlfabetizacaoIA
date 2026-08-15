@@ -1,0 +1,121 @@
+# =====================================================================
+# Backend Python do Curumim Marajoara (Flask + Gunicorn)
+#
+# Por que esta imagem:
+# - python:3.12-slim-bookworm: base pequena e estável (Debian 12) com o
+#   Python 3.12 exigido pelo projeto (requires-python >= 3.11).
+# - ffmpeg: o TTS chama o binário via subprocess para converter o WAV
+#   em OGG/Opus (`ffmpeg -c:a libopus`, tts_service.py).
+# - libespeak-ng1: o Kokoro (kokoro-onnx) usa o eSpeak NG para gerar
+#   fonemas; o tts_service.py FIXA caminhos x86_64
+#   (/lib/x86_64-linux-gnu/libespeak-ng.so.1 e
+#   /usr/lib/x86_64-linux-gnu/espeak-ng-data), então a imagem é amd64.
+# - wget: usado no build para baixar os modelos do Kokoro (a imagem
+#   slim não traz curl nem wget).
+# - ca-certificates: necessário para HTTPS (wget no build e requests do
+#   backend no runtime, ex.: Ollama/Gemini).
+#
+# Estrutura de diretórios (fatos do código):
+# - O backend usa caminhos RELATIVOS ao CWD (WORKDIR /app):
+#     data/chroma_db (ChromaDB)   → /app/data/chroma_db
+#     data/audios (TTS)           → /app/data/audios
+#     logs/ (Loguru + Gunicorn)   → /app/logs
+#     models/ (Kokoro ONNX)       → /app/models
+# - database.py resolve PROJECT_ROOT = parents[2] do arquivo em
+#   src/curumim/models/ → /app/src; o SQLite fica em
+#   /app/src/data/curumim.db (volume curumim_db no compose).
+# =====================================================================
+FROM python:3.12-slim-bookworm
+
+# CWD de todos os processos: os caminhos relativos do código (data/,
+# logs/, models/) são resolvidos a partir daqui.
+WORKDIR /app
+
+# uv: instalador de ambiente Python (gera o venv em /app/.venv).
+# Copiamos o binário estático oficial direto da imagem do Astral —
+# evita instalar via pip e garante a versão mais recente do uv.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Define explicitamente o interpretador (evita o uv baixar um Python
+# gerenciado durante o build — o da imagem já é 3.12, compatível).
+ENV UV_PYTHON=/usr/local/bin/python3
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libespeak-ng1 \
+        wget \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Diretórios de runtime que o código espera existir:
+#   /app/data        → ChromaDB, áudios TTS, conhecimento (data/knowledge)
+#   /app/src/data    → banco SQLite (mount do volume curumim_db)
+#   /app/logs        → Gunicorn (logs/gunicorn_*.log) e Loguru
+#   /app/models      → modelos do Kokoro (baixados abaixo)
+RUN mkdir -p /app/src/data /app/data /app/logs /app/models
+
+# ---------------------------------------------------------------------
+# Instalação das dependências Python
+#
+# IMPORTANTE (torch CPU vs CUDA): o uv.lock foi gerado a partir do PyPI
+# padrão, onde o torch 2.13.0 para Linux é o pacote COM CUDA (deps
+# nvidia-cudnn-cu13 etc.). Por isso NÃO usamos
+# `--extra-index-url https://download.pytorch.org/whl/cpu`: com
+# `--frozen` o uv não re-resolve e os hashes do lock não batem com as
+# wheels CPU → o build falharia com hash mismatch.
+# Trade-off aceito: a imagem fica maior (dezenas de GB de pacotes CUDA
+# que não são usados em CPU). Para reduzir, seria preciso regenerar o
+# lock com wheels CPU (`uv lock --index https://download.pytorch.org/whl/cpu`)
+# e ajustar este RUN — fora do escopo desta entrega.
+#
+# Cache de camadas: primeiro só as dependências (--no-install-project);
+# depois o código do projeto. Assim, alterar src/ não refaz o download
+# do torch/nemo/chromadb (~GB) a cada build.
+# ---------------------------------------------------------------------
+COPY pyproject.toml uv.lock README.md .env.example ./
+
+# Passo 1: baixa e instala SOMENTE as dependências (sem o pacote curumim)
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
+
+# Passo 2: código do backend (src/curumim)
+COPY src ./src
+
+# Config do Gunicorn usada no CMD (workers/bind/logs)
+COPY deploy/gunicorn_config.py ./deploy/
+
+# Conhecimento cultural marajoara (fonte: deploy/data/knowledge no repo).
+# O rag_service lê de data/knowledge (relativo ao CWD /app) — a ingestão
+# pode ser feita a qualquer momento com scripts/ingest_knowledge.py.
+# (Na 1ª subida, o Docker copia este diretório para o volume
+# curumim_data montado em /app/data — comportamento de named volumes.)
+COPY deploy/data/knowledge /app/data/knowledge
+
+# Passo 3: instala o pacote curumim (editable) no venv — rápido, deps já
+# estão no venv/cache do passo 1.
+RUN uv sync --frozen --no-dev
+
+# Modelos do Kokoro (TTS): sem eles o TTS desabilita com log de erro
+# (tts_service.py). Baixar no BUILD deixa a imagem autocontida e o TTS
+# pronto na 1ª execução. As vozes ficam em voices-v1.0.bin (a voz é
+# escolhida via TTS_VOICE em runtime; pm_santa já vem no .bin).
+RUN wget -q -O /app/models/kokoro-v1.0.onnx \
+        https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx \
+    && wget -q -O /app/models/voices-v1.0.bin \
+        https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+
+# PATH aponta para o venv criado pelo uv (gunicorn, python etc.)
+ENV PATH="/app/.venv/bin:$PATH" \
+    PORT=5000
+
+# Healthcheck sem curl (imagem slim): usa o Python do venv.
+# O backend expõe GET /health (e /v1/health) — main.py.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3).status == 200 else 1)"
+
+EXPOSE 5000
+
+# Gunicorn com workers FIXOS em 2 (o config calcula 2*cpu+1, o que
+# estoura em hosts com muitos núcleos e derruba o container por RAM) e
+# timeout de 180s (Parakeet/STT e a IA podem passar de 30s na 1ª vez).
+# A CLI --workers tem precedência sobre o workers do gunicorn_config.py.
+CMD ["gunicorn", "-c", "deploy/gunicorn_config.py", "--workers", "2", "--timeout", "180", "curumim.main:create_app()"]

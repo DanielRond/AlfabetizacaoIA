@@ -1,0 +1,83 @@
+# =====================================================================
+# Conector Node (whatsapp-web.js) do Curumim Marajoara
+#
+# Por que esta imagem:
+# - node:20-bookworm-slim: Node 20 LTS (o package.json exige >= 18),
+#   base Debian 12 (mesma família da imagem do backend).
+#   (As tags do Node seguem o formato <versão>-<os>-slim, diferente do
+#   Python que usa <versão>-slim-<os>.)
+# - Chromium via apt EM VEZ do Chrome for Testing do puppeteer:
+#   PUPPETEER_SKIP_DOWNLOAD=true evita o download do Chrome (~170 MB)
+#   no `npm ci`, e WHATSAPP_BROWSER_PATH=/usr/bin/chromium aponta o
+#   whatsapp-web.js/puppeteer para o navegador do sistema (estratégia
+#   já documentada em docs/09-operacao.md).
+# - ffmpeg: o whatsapp-web.js usa fluent-ffmpeg (dependência transitiva)
+#   para processar mídia e pode invocar o binário ffmpeg do PATH em runtime.
+#
+# ESTRUTURA DE DIRETÓRIOS (decisão importante, config.js do conector):
+# O conector resolve caminhos a partir de __dirname (não do CWD):
+#   workspaceRoot = parent(src)  → /app/apps/whatsapp-connector
+#   repoRoot      = parent(parent(src)) → /app  ← a "raiz do repositório"
+# Copiar o app para /app/apps/whatsapp-connector REPLICA o layout do
+# repo (apps/whatsapp-connector), então:
+#   - WHATSAPP_SESSION_DIR=.wwebjs_auth resolve para
+#     /app/apps/whatsapp-connector/.wwebjs_auth (volume wwebjs_auth);
+#   - WHATSAPP_MEDIA_DIR=data/media_in resolve para /app/data/media_in
+#     (dentro do volume curumim_data, compartilhado com o backend);
+#   - MEDIA_BASE_DIR=/app (compose) resolve os media_ref do backend
+#     ("data/audios/tts_x.ogg") para /app/data/audios/... — exatamente
+#     onde o backend gravou o áudio.
+# Se o src fosse copiado em /app/src, o repoRoot viraria "/" e a mídia
+# cairia fora do volume compartilhado.
+# =====================================================================
+FROM node:20-bookworm-slim
+
+# Dependências do Chromium no Debian bookworm (lista equivalente à do
+# puppeteer) + chromium + ffmpeg + ca-certificates.
+# --no-install-recommends mantém a imagem enxuta (sem recomendações).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        ffmpeg \
+        ca-certificates \
+        libnss3 \
+        libnspr4 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxrandr2 \
+        libgbm1 \
+        libasound2 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libglib2.0-0 \
+        fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+# Navegador do sistema em vez do Chrome for Testing (ver comentário acima)
+ENV PUPPETEER_SKIP_DOWNLOAD=true \
+    WHATSAPP_BROWSER_PATH=/usr/bin/chromium
+
+# WORKDIR = apps/whatsapp-connector no layout do repo (ver comentário
+# sobre config.js no topo). npm ci e npm start rodam a partir daqui.
+WORKDIR /app/apps/whatsapp-connector
+
+# package-lock.json existe no repo → npm ci (instalação reprodutível).
+# --omit=dev: nenhuma dependência de desenvolvimento na imagem.
+# Obs.: se algum pacote exigir compilação nativa no futuro (node-gyp),
+# adicione build-essential python3 a este apt-get.
+COPY apps/whatsapp-connector/package.json apps/whatsapp-connector/package-lock.json ./
+RUN npm ci --omit=dev
+
+# Código do conector (src/index.js, handlers, normalizer, apiClient...)
+COPY apps/whatsapp-connector/src ./src
+
+# O conector NÃO expõe porta HTTP: ele é um cliente (fala com o backend
+# via rede interna do compose, PYTHON_API_URL=http://backend:5000).
+# O stop_grace_period de 30s para o WhatsApp encerrar a sessão com
+# elegância é definido no compose.yaml (não aqui).
+CMD ["npm", "start"]

@@ -107,3 +107,24 @@ Registro das decisões de design mais relevantes. Cada ADR segue o formato
   `src/`, logo o banco é `src/data/curumim.db`. `*.db` é ignorado pelo git.
 - **Consequências**: o banco não é versionado; quem aponta o código para `data/`
   deve usar o caminho resolvido pelo próprio `database.py`.
+
+## ADR-012 — Deploy conteinerizado com Docker Compose
+
+- **Contexto**: os dois serviços compartilham arquivos por referência (ADR-003) e o
+  backend depende de caminhos relativos ao CWD; o deploy manual exigia gunicorn +
+  processo Node separados e o re-download de modelos em cada máquina nova.
+- **Decisão**: Docker Compose com **duas imagens** — `backend` (Python 3.12-slim,
+  Gunicorn 2 workers) e `connector` (Node 20-slim com Chromium) — e perfil opcional
+  `ollama`. Os arquivos compartilhados ficam no volume `curumim_data` montado em
+  `/app/data` com o **mesmo caminho** nos dois containers (`MEDIA_BASE_DIR=/app` no
+  conector); o banco fica em volume separado (`curumim_db` em `/app/src/data`); os
+  modelos Kokoro são baixados **no build** da imagem, com a voz escolhida em runtime
+  por `TTS_VOICE`. Sessão do WhatsApp (`wwebjs_auth`) e caches (Hugging Face, Chroma)
+  em volumes named. Portas de serviço expostas apenas em `127.0.0.1`,
+  `restart: unless-stopped` e unit systemd opcional para VPS.
+- **Consequências**:
+  - **Benefícios**: deploy idempotente em local e VPS; persistência garantida pelos
+    volumes; sem re-download de modelos a cada execução.
+  - **Custos**: imagem x86_64 (libespeak-ng hardcoded) — ARM exige adaptação;
+    workers fixos em 2 no container; a memória do Parakeet (~5,3 GB RSS) deve ser
+    planejada no host; mudanças de código exigem rebuild da imagem (`make build`).

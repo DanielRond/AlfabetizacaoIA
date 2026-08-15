@@ -1,0 +1,132 @@
+# =====================================================================
+# Docker Compose do Curumim Marajoara
+#
+# Estrutura: dois serviços independentes + Ollama opcional (profile):
+#   backend   → Flask/Gunicorn em /app (Python) — expõe 0.0.0.0:5000
+#   connector → whatsapp-web.js em /app/apps/whatsapp-connector (Node)
+#   ollama    → perfil opcional "ollama" (subir com: make up-ollama)
+#
+# Rede interna curumim-net: o nome do serviço é o hostname. O backend
+# conversa com "ollama" e o connector com "backend" — nada é exposto
+# para fora além das portas 127.0.0.1 (smoke test / API da IA local).
+#
+# Configuração: copie deploy/.env.compose.example → deploy/.env
+# (este compose usa env_file: .env, relativo a este arquivo).
+# =====================================================================
+name: curumim
+
+services:
+  # ------------------------------------------------------------------
+  # Backend Python (Flask + Gunicorn) — a "cabeça pedagógica"
+  # ------------------------------------------------------------------
+  backend:
+    build:
+      context: ..        # raiz do repo (o Dockerfile fica em deploy/)
+      dockerfile: deploy/Dockerfile.backend
+    container_name: curumim-backend
+    restart: unless-stopped
+    env_file: .env       # deploy/.env (copie de .env.compose.example)
+    environment:
+      # Dentro do compose o Ollama (se o profile estiver ativo) é o
+      # serviço "ollama". Sobrescreve o valor do .env. Se
+      # IA_PROVIDER=gemini, esta URL não é usada.
+      OLLAMA_API_URL: http://ollama:11434/api/generate
+    ports:
+      # Só localhost: usado para smoke test (make smoke). O WhatsApp
+      # nunca fala direto com o backend — quem fala é o connector,
+      # pela rede interna.
+      - "127.0.0.1:5000:5000"
+    volumes:
+      # Dados CWD-relativos do backend: ChromaDB (data/chroma_db) e
+      # áudios TTS (data/audios). O MESMO volume é montado no connector
+      # em /app/data → os dois enxergam os mesmos arquivos (o connector
+      # resolve o media_ref "data/audios/tts_x.ogg" contra
+      # MEDIA_BASE_DIR=/app → /app/data/audios/...).
+      # Na 1ª subida, o Docker copia /app/data/knowledge (da imagem)
+      # para este volume; se o volume já existir sem o conhecimento,
+      # rode scripts/ingest_knowledge.py dentro do container.
+      - curumim_data:/app/data
+      # Banco SQLite: database.py resolve PROJECT_ROOT → /app/src,
+      # então o banco vive em /app/src/data/curumim.db.
+      - curumim_db:/app/src/data
+      # Caches de runtime: STT (NeMo/Parakeet baixa da Hugging Face no
+      # 1º uso) e ChromaDB (cache da embedding function).
+      - hf_cache:/root/.cache/huggingface
+      - chroma_cache:/root/.cache/chroma
+    networks:
+      - curumim-net
+    # Healthcheck: herdado do Dockerfile (python urllib, sem curl na
+    # imagem slim). O connector espera service_healthy via depends_on.
+
+  # ------------------------------------------------------------------
+  # Conector Node (whatsapp-web.js) — sessão WhatsApp e envio
+  # ------------------------------------------------------------------
+  connector:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.connector
+    container_name: curumim-connector
+    restart: unless-stopped
+    depends_on:
+      # Só dispara o login/QR com o backend saudável (evita fila de
+      # retries logo na 1ª subida).
+      backend:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Rede interna: "backend" é o hostname do serviço Python.
+      PYTHON_API_URL: http://backend:5000
+      # "Raiz do repositório" dentro do container (ver Dockerfile.connector):
+      # o media_ref do backend ("data/audios/tts_x.ogg") resolve para
+      # /app/data/audios/... — o MESMO arquivo que o backend gravou no
+      # volume curumim_data compartilhado.
+      MEDIA_BASE_DIR: /app
+      # Resolvidos pelo config.js do conector:
+      #   sessionDir = /app/apps/whatsapp-connector/.wwebjs_auth (volume)
+      #   mediaDir   = /app/data/media_in (dentro de curumim_data)
+      WHATSAPP_SESSION_DIR: .wwebjs_auth
+      WHATSAPP_MEDIA_DIR: data/media_in
+    volumes:
+      # Mídia compartilhada com o backend (mesmo volume, mesmo caminho):
+      # o backend grava data/audios, o connector lê de lá para enviar.
+      - curumim_data:/app/data
+      # Sessão WhatsApp persistida (LocalAuth) — sem QR a cada reinício.
+      - wwebjs_auth:/app/apps/whatsapp-connector/.wwebjs_auth
+    stop_grace_period: 30s  # tempo p/ o WhatsApp encerrar a sessão limpo
+    networks:
+      - curumim-net
+
+  # ------------------------------------------------------------------
+  # Ollama (OPCIONAL) — gerador local de IA
+  # ------------------------------------------------------------------
+  # Fica fora do `up` padrão: ative com `make up-ollama` (ou
+  # `docker compose --profile ollama up -d`). O backend já nasce
+  # apontando para http://ollama:11434/api/generate; sem o Ollama ele
+  # degrada com fallback (ou use IA_PROVIDER=gemini no .env).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: curumim-ollama
+    restart: unless-stopped
+    profiles: ["ollama"]
+    volumes:
+      # Modelos baixados (llama3.2 etc.) — persistem entre reinícios.
+      - ollama_models:/root/.ollama
+    ports:
+      # Só localhost: permite puxar modelos com `ollama pull` no host.
+      - "127.0.0.1:11434:11434"
+    networks:
+      - curumim-net
+
+# =====================================================================
+# Volumes nomeados (todos locais, sem driver especial)
+# =====================================================================
+volumes:
+  curumim_data:    # /app/data — compartilhado entre backend e connector
+  curumim_db:      # /app/src/data — banco SQLite do backend
+  wwebjs_auth:     # sessão WhatsApp do connector (.wwebjs_auth)
+  hf_cache:        # cache Hugging Face (Parakeet/STT)
+  chroma_cache:    # cache do ChromaDB
+  ollama_models:   # modelos do Ollama
+
+networks:
+  curumim-net:     # bridge padrão

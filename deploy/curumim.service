@@ -1,0 +1,35 @@
+# =====================================================================
+# Unit systemd para o conjunto de containers do Curumim Marajoara (VPS)
+#
+# Instalação (ajuste o caminho do repo antes):
+#   sudo cp deploy/curumim.service /etc/systemd/system/curumim.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now curumim
+#
+# Como funciona:
+# - Os containers INDIVIDUAIS são reiniciados pelo próprio Docker
+#   (restart: unless-stopped no compose.yaml); o systemd não acompanha
+#   cada container — ele apenas garante que o CONJUNTO sobe no boot e
+#   derruba tudo no stop (Type=oneshot + RemainAfterExit=yes).
+# - Requer o plugin `docker compose`. Em distros antigas sem o plugin,
+#   troque `/usr/bin/docker compose` por `/usr/bin/docker-compose`.
+# - O compose precisa do deploy/.env (copie de .env.compose.example).
+# =====================================================================
+
+[Unit]
+Description=Curumim Marajoara (conjunto de containers Docker Compose)
+Requires=docker.service
+After=docker.service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Caminho onde o compose.yaml e o .env vivem (ajuste se instalou em outro lugar)
+WorkingDirectory=/opt/curumim/deploy
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
