@@ -16,11 +16,12 @@ para aprofundamento.
 | [`06-modulos-node.md`](06-modulos-node.md) | Walkthrough de cada módulo do conector Node (`apps/whatsapp-connector/src/`) |
 | [`07-modulos-python.md`](07-modulos-python.md) | Walkthrough do backend Python (`src/curumim/`) |
 | [`08-decisoes.md`](08-decisoes.md) | Decisões arquiteturais (ADRs) e rationale por trás das escolhas |
-| [`09-operacao.md`](09-operacao.md) | Variáveis de ambiente, setup, execução, deploy e testes |
+| [`09-operacao.md`](09-operacao.md) | Variáveis de ambiente, setup, execução, deploy (Docker Compose) e testes |
 | [`10-plano-teste-servicos.md`](10-plano-teste-servicos.md) | Plano pendente do teste manual STT + IA + TTS via Gemini |
 
 ## Como usar
 
+- **Quero rodar rápido (dev ou deploy)** → [Quick Start do README](../README.md#quick-start)
 - **Quero saber o que o projeto faz** → [01-visao-geral.md](01-visao-geral.md)
 - **Quero entender como os serviços se conectam** → [02-arquitetura.md](02-arquitetura.md) e [04-contrato-api.md](04-contrato-api.md)
 - **Quero acompanhar o caminho de uma mensagem** → [03-fluxos.md](03-fluxos.md)

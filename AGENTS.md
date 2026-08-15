@@ -54,6 +54,10 @@ uv run python -m curumim.main          # http://localhost:5000
 
 # Rodar conector Node (QR na primeira execução)
 cd apps/whatsapp-connector && npm start
+
+# Deploy conteinerizado (Docker Compose — deploy/Makefile)
+make -C deploy up          # sobe backend + connector (QR na 1ª vez)
+make -C deploy up-ollama   # ativa também o Ollama local (profile opcional)
 ```
 
 Nenhuma alteração de código deve quebrar as suítes (45 Python + 42 Node).

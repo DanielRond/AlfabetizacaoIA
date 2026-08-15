@@ -50,6 +50,59 @@ AlfabetizacaoIA/
 
 ---
 
+## Quick Start
+
+Dois caminhos para rodar o projeto — escolha o seu:
+
+| Caminho | Para quem | Comandos |
+|---|---|---|
+| **A — Dev (sem Docker)** | Desenvolver/testar rápido | ~6 comandos (abaixo) |
+| **B — Deploy (Docker Compose)** | Subir o sistema completo em produção | ~5 comandos (abaixo) |
+
+### Caminho A — Dev (sem Docker)
+
+```bash
+uv sync                                     # instala dependências Python
+cp .env.example .env                        # configure IA e TTS
+uv run python scripts/ingest_knowledge.py   # (opcional) popula o RAG
+ollama serve                                # terminal 1 (opcional): daemon da IA local
+ollama pull llama3.2                        # depois de iniciado (uma vez)
+uv run python -m curumim.main               # terminal 2: backend (http://localhost:5000)
+
+# terminal 3: conector WhatsApp (QR na 1ª execução)
+cd apps/whatsapp-connector && npm install && npm start
+```
+
+Detalhes: [Como Executar](#como-executar) e [Rodar com o Conector WhatsApp (Node)](#rodar-com-o-conector-whatsapp-node).
+
+### Caminho B — Deploy (Docker Compose)
+
+```bash
+cd deploy
+cp .env.compose.example .env                # configure IA, TTS e chaves
+make build                                  # constrói as imagens (baixa modelos Kokoro)
+make up                                     # sobe backend + connector
+make qr                                     # 1ª vez: escaneie o QR do WhatsApp
+```
+
+IA local opcional (Ollama):
+
+```bash
+make up-ollama                              # sobe o container do Ollama
+docker exec curumim-ollama ollama pull llama3.2   # baixa o modelo (uma vez)
+```
+
+> **IA**: sem o Ollama, defina `IA_PROVIDER=gemini` (e `GEMINI_API_KEY`) no `deploy/.env`,
+> senão o backend responde com o fallback de "estou com dificuldades".
+
+> **Voz do TTS**: as 3 vozes PT-BR (`pm_santa`, `pf_dora`, `pm_alex`) já vêm no
+> `voices-v1.0.bin` da imagem. Trocar de voz = editar `TTS_VOICE` no `deploy/.env`
+> (exemplo usa `pm_santa`; o default do código é `pf_dora`) — **sem rebuild**.
+
+Detalhes (volumes, troubleshooting, systemd): [docs/09-operacao.md](docs/09-operacao.md).
+
+---
+
 ## Como Executar
 
 ### 1. Pré-requisitos
@@ -183,7 +236,11 @@ uv run pytest -m integration
 
 ## Deploy em Produção
 
-O projeto usa **Gunicorn** em produção, com a configuração em `deploy/gunicorn_config.py`:
+O caminho oficial é **Docker Compose** (`deploy/compose.yaml` + `deploy/Makefile`):
+veja o passo a passo no [Quick Start](#quick-start) e os detalhes em
+[docs/09-operacao.md](docs/09-operacao.md).
+
+Alternativa sem container (Gunicorn):
 
 ```bash
 uv run gunicorn -c deploy/gunicorn_config.py "curumim.main:create_app()"
